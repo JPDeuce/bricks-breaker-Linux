@@ -1,12 +1,11 @@
-# unpacked plugin folders
-plugins/**/*
+# Build artifacts
+bricks
+*.o
 
-# files directory where uploads go
-files
-
-# DBMigrate plugin: generated SQL
-db/sql
-
-# AssetBundler plugin: generated bundles
-javascripts/bundles
-stylesheets/bundles
+# Visual Studio (legacy)
+.vs/
+x64/
+Debug/
+*.sln
+*.vcxproj*
+*.exe
