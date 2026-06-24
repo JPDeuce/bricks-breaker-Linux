@@ -1,5 +1,6 @@
 # Build artifacts
 bricks
+test_game
 *.o
 
 # Visual Studio (legacy)

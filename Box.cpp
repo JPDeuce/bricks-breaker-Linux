@@ -3,7 +3,7 @@
 
 void Box::Draw() const
 {
-	Console::ForegroundColor(color);
+	Console::ForegroundColor(static_cast<WORD>(color));
 	Console::DrawBox(x_position, y_position, width, height, doubleThick);
 }
 

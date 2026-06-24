@@ -5,7 +5,7 @@ class BaseObject
 {
 public:
 
-	ConsoleColor color = White;			
+	ConsoleColor color = ConsoleColor::White;			
 	int x_position = 0;
 	int y_position = 0;
 	char visage = '.';

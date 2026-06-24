@@ -12,6 +12,8 @@ class Game
 	bool gameWon = false;
 	bool gameLost = false;
 	int currentLevel = 1;
+	int score = 0;
+	int lives = 3;
 
 public:
 	Game();
@@ -21,4 +23,5 @@ public:
 	void ResetBall();
 	void CheckCollision();
 	void LoadLevel(int level);
+	void DrawHUD() const;
 };

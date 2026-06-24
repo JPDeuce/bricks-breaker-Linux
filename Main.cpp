@@ -5,7 +5,6 @@
 #include <cstdlib>
 #include <ctime>
 #include <algorithm>
-using namespace std::chrono;
 
 int main()
 {
@@ -14,7 +13,7 @@ int main()
 	Game game;
 	while (true)
 	{
-		auto start = steady_clock::now();
+		auto start = std::chrono::steady_clock::now();
 
 		Console::ProcessInput();
 
@@ -28,9 +27,9 @@ int main()
 		if (GetAsyncKeyState(VK_DOWN) & 0x1)
 			frameTimer += 5;
 
-		auto end = steady_clock::now();
-		auto durationMS = duration_cast<milliseconds>(end - start);
+		auto end = std::chrono::steady_clock::now();
+		auto durationMS = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		auto timeLeft = std::max(0.0f, frameTimer - static_cast<float>(durationMS.count()));
-		std::this_thread::sleep_for(milliseconds(static_cast<int>(timeLeft)));
+		std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(timeLeft)));
 	}
 }

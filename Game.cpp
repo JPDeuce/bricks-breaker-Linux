@@ -1,6 +1,9 @@
 #include "Common.h"
 #include "Game.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 Game::Game()
 {
 	Reset();
@@ -21,6 +24,8 @@ void Game::Reset()
 	gameWon = false;
 	gameLost = false;
 	currentLevel = 1;
+	score = 0;
+	lives = 3;
 	LoadLevel(1);
 }
 
@@ -38,6 +43,44 @@ void Game::LoadLevel(int level)
 	bricks.clear();
 	currentLevel = level;
 
+	// Try loading from a level data file
+	char filename[64];
+	std::snprintf(filename, sizeof(filename), "levels/level%d.txt", level);
+
+	FILE* f = std::fopen(filename, "r");
+	if (f)
+	{
+		char line[128];
+		while (std::fgets(line, sizeof(line), f))
+		{
+			if (line[0] == '#' || line[0] == '\n' || line[0] == '\r')
+				continue;
+
+			int x, y, w, h, color, dbl;
+			if (std::sscanf(line, "%d %d %d %d %d %d", &x, &y, &w, &h, &color, &dbl) != 6)
+				continue;
+
+			if (x < 1) x = 1;
+			if (y < 1) y = 1;
+			if (w < 1) w = 1;
+			if (h < 1) h = 1;
+			if (color < 0) color = 0;
+			if (color > 15) color = 15;
+
+			Box brick;
+			brick.x_position = x;
+			brick.y_position = y;
+			brick.width = w;
+			brick.height = h;
+			brick.color = static_cast<ConsoleColor>(color);
+			brick.doubleThick = (dbl != 0);
+			bricks.push_back(brick);
+		}
+		std::fclose(f);
+		return;
+	}
+
+	// Fallback: hardcoded levels (used if levels/ directory is missing)
 	if (level == 1)
 	{
 		for (int i = 0; i < 5; i++)
@@ -223,6 +266,8 @@ void Game::Render() const
 
 	Console::DrawBox(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, false);
 
+	DrawHUD();
+
 	paddle.Draw();
 	ball.Draw();
 
@@ -244,36 +289,101 @@ void Game::Render() const
 	Console::Lock(false);
 }
 
+void Game::DrawHUD() const
+{
+	Console::ForegroundColor(static_cast<WORD>(ConsoleColor::White));
+
+	char buf[64];
+	std::snprintf(buf, sizeof(buf), "Level: %d", currentLevel);
+	Console::SetCursorPosition(2, 1);
+	std::cout << buf;
+
+	std::snprintf(buf, sizeof(buf), "Score: %d", score);
+	Console::SetCursorPosition(WINDOW_WIDTH / 2 - 4, 1);
+	std::cout << buf;
+
+	std::snprintf(buf, sizeof(buf), "Lives: %d", lives);
+	Console::SetCursorPosition(WINDOW_WIDTH - 12, 1);
+	std::cout << buf;
+}
+
 void Game::CheckCollision()
 {
-	int nextX = ball.x_position + ball.x_velocity;
-	int nextY = ball.y_position + ball.y_velocity;
+	int bx = ball.x_position;
+	int by = ball.y_position;
+	int vx = ball.x_velocity;
+	int vy = ball.y_velocity;
+	int nextX = bx + vx;
+	int nextY = by + vy;
 
+	// --- Brick collisions ---
 	for (size_t i = 0; i < bricks.size(); i++)
 	{
-		if (bricks[i].Contains(nextX, nextY) || bricks[i].Contains(ball.x_position, nextY) || bricks[i].Contains(nextX, ball.y_position))
+		Box& brick = bricks[i];
+		bool hit = false;
+		bool hitX = false;
+		bool hitY = false;
+
+		// Determine how the ball enters the brick
+		if (brick.Contains(nextX, nextY))
 		{
-			if (bricks[i].color > ConsoleColor::Black)
-				bricks[i].color = static_cast<ConsoleColor>(bricks[i].color - 1);
+			// Full next position is inside → determine which face(s) were crossed
+			hit = true;
+			bool outsideX = (bx < brick.x_position || bx >= brick.x_position + brick.width);
+			bool outsideY = (by < brick.y_position || by >= brick.y_position + brick.height);
+			if (outsideX) hitX = true;
+			if (outsideY) hitY = true;
+			if (!outsideX && !outsideY)
+				hitX = hitY = true;
+		}
 
-			if (ball.x_position <= bricks[i].x_position || ball.x_position >= bricks[i].x_position + bricks[i].width)
-				ball.x_velocity *= -1;
+		if (!hit && brick.Contains(bx, nextY))
+		{
+			// Only Y changed, X stayed the same → vertical entry
+			hit = true;
+			hitY = true;
+		}
 
-			if (ball.y_position <= bricks[i].y_position || ball.y_position >= bricks[i].y_position + bricks[i].height)
-				ball.y_velocity *= -1;
+		if (!hit && brick.Contains(nextX, by))
+		{
+			// Only X changed, Y stayed the same → horizontal entry
+			hit = true;
+			hitX = true;
+		}
 
-			if (bricks[i].color == ConsoleColor::Black)
-			{
-				bricks.erase(bricks.begin() + i);
-				i--;
-			}
-			else
-			{
-				break;
-			}
+		if (!hit)
+			continue;
+
+		// Dim the brick
+		int c = static_cast<int>(brick.color);
+		if (c > static_cast<int>(ConsoleColor::Black))
+			brick.color = static_cast<ConsoleColor>(c - 1);
+
+		// Reverse velocity on the appropriate axes
+		if (hitX) vx *= -1;
+		if (hitY) vy *= -1;
+
+		// Remove brick if fully dimmed
+		if (brick.color == ConsoleColor::Black)
+		{
+			bricks.erase(bricks.begin() + i);
+			i--;
+			score += 100 * currentLevel;
+
+			// Recalculate next position with updated velocity
+			nextX = bx + vx;
+			nextY = by + vy;
+		}
+		else
+		{
+			break;
 		}
 	}
 
+	ball.x_velocity = vx;
+	ball.y_velocity = vy;
+
+	// --- Level complete? ---
 	if (bricks.empty())
 	{
 		if (currentLevel < 5)
@@ -286,20 +396,39 @@ void Game::CheckCollision()
 			gameWon = true;
 			ball.moving = false;
 		}
+		return;
 	}
 
-	if (paddle.Contains(nextX, nextY))
+	// --- Paddle collision ---
+	// Recalculate next position with the (possibly updated) velocity
+	nextX = ball.x_position + ball.x_velocity;
+	nextY = ball.y_position + ball.y_velocity;
+
+	if (paddle.Contains(nextX, nextY)
+		|| paddle.Contains(nextX, ball.y_position)
+		|| paddle.Contains(ball.x_position, nextY))
 	{
 		float ratio = static_cast<float>(ball.x_position - paddle.x_position) / paddle.width;
 		ball.x_velocity = static_cast<int>((ratio - 0.5f) * 4.0f);
 		if (ball.x_velocity == 0)
 			ball.x_velocity = (rand() % 2) ? -1 : 1;
 		ball.y_velocity = -1;
+		ball.y_position = paddle.y_position - 1;
 	}
 
+	// --- Ball fell off bottom ---
+	nextY = ball.y_position + ball.y_velocity;
 	if (nextY >= WINDOW_HEIGHT - 1)
 	{
-		ball.moving = false;
-		gameLost = true;
+		lives--;
+		if (lives > 0)
+		{
+			ResetBall();
+		}
+		else
+		{
+			ball.moving = false;
+			gameLost = true;
+		}
 	}
 }

@@ -4,7 +4,7 @@
 typedef unsigned short WORD;
 
 // Colors - can be used as Foreground or Background
-enum ConsoleColor
+enum class ConsoleColor : int
 {
 	Black = 0,
 	DarkBlue = 1,

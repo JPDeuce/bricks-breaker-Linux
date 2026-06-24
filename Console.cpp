@@ -28,6 +28,24 @@ static void handle_sigint(int)
 	_exit(128 + SIGINT);
 }
 
+static void handle_sigterm(int)
+{
+	restore_termios();
+	_exit(128 + SIGTERM);
+}
+
+static void handle_sigquit(int)
+{
+	restore_termios();
+	_exit(128 + SIGQUIT);
+}
+
+static void handle_sigsegv(int)
+{
+	restore_termios();
+	_exit(128 + SIGSEGV);
+}
+
 static void setup_termios()
 {
 	if (!termios_saved)
@@ -44,6 +62,9 @@ static void setup_termios()
 		tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 
 		std::signal(SIGINT, handle_sigint);
+		std::signal(SIGTERM, handle_sigterm);
+		std::signal(SIGQUIT, handle_sigquit);
+		std::signal(SIGSEGV, handle_sigsegv);
 		atexit(restore_termios);
 	}
 }
