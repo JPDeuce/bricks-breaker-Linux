@@ -1,5 +1,21 @@
 # Bricks Breaker
 
+## Project Context
+
+This repository is based on a class lab assignment, but it was primarily used as a sandbox for experimenting with development tooling in a Linux container environment.
+
+The focus of this work was not simply completing the original assignment, but evaluating how effectively automated tooling (such as code generation and refactoring tools) could modify and extend an existing C++ codebase in a controlled environment.
+
+## Modifications & Experiments
+
+- Executed and tested the project in a Linux container environment
+- Made code modifications to evaluate automated tooling behavior on an existing C++ codebase
+- Fixed issues encountered during cross-environment execution (Windows → Linux)
+- Added gameplay levels as part of iterative testing and experimentation
+- Refactored and adjusted parts of the project to support stable execution in a Linux build environment
+
+---
+
 A classic breakout-style arcade game that runs entirely in the Linux terminal, written in C++11.
 
 Break bricks by bouncing a ball off your paddle — clear all bricks to advance through 5 levels.
@@ -10,7 +26,7 @@ Break bricks by bouncing a ball off your paddle — clear all bricks to advance 
 
 | Key            | Action                 |
 |----------------|------------------------|
-| ← / →         | Move paddle            |
+| ← / →          | Move paddle            |
 | Space          | Launch / pause ball    |
 | Up / Down      | Speed up / slow down   |
 | R              | Restart game           |
