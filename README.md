@@ -37,10 +37,23 @@ Break bricks by bouncing a ball off your paddle — clear all bricks to advance 
 - **Bricks**: Each brick dims on hit; after enough hits it disappears
 - **Lives**: 3 lives per game — ball falling costs one life
 - **Score**: 100 points per brick × current level
-- **HUD**: Shows current level, score, and lives remaining
+- **HUD**: Shows current level, score, lives, and active power-up timers
 - **Levels**: 5 levels loaded from `levels/levelN.txt` files
 - **Win**: Clear all bricks on level 5
 - **Lose**: Run out of lives
+
+### Power-ups
+
+Destroyed bricks have a 1-in-3 chance to drop a power-up. Catch it with the paddle to collect.
+
+| Icon | Color  | Effect                                     | Duration |
+|------|--------|--------------------------------------------|----------|
+| `[W]` | Green  | Widens the paddle (12 → 20)               | 10s      |
+| `[L]` | Red    | Grants an extra life (max 9)              | instant  |
+| `[F]` | Yellow | Ball passes through bricks, destroying them| 8s       |
+| `[S]` | Cyan   | Ball moves at half speed                   | 8s       |
+
+Active power-ups are shown on the HUD with remaining seconds (e.g., `[W]Wide 10`). Effects expire at level transitions.
 
 ## Build
 
@@ -94,6 +107,7 @@ Game.h / .cpp     Game state, collision detection, level loading, rendering, HUD
 Ball.h / .cpp     Ball movement and wall bouncing
 Box.h / .cpp      Paddle and brick drawing, hitbox containment
 BaseObject.h/.cpp Base class with position, color, and character display
+PowerUp.h / .cpp  Falling power-up items — Wide Paddle, Extra Life, Fire Ball, Slow Ball
 Console.h / .cpp  Terminal abstraction — ANSI escape rendering, Unicode box-drawing,
                   raw-mode keyboard input with cross-platform GetAsyncKeyState
 Common.h          Constants: window size (80×40), frame rate (15 FPS)

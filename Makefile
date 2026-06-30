@@ -2,10 +2,10 @@ CXX       := g++
 CXXFLAGS  := -std=c++11 -Wall -Wextra -g
 RELEASEFLAGS := -std=c++11 -Wall -Wextra -O2 -DNDEBUG
 LDFLAGS   :=
-OBJS      := Main.o Game.o Ball.o Box.o BaseObject.o Console.o
+OBJS      := Main.o Game.o Ball.o Box.o BaseObject.o Console.o PowerUp.o
 TARGET    := bricks
 TEST_SRC  := tests/test_game.cpp
-TEST_OBJS := test_game.o Game.o Ball.o Box.o BaseObject.o Console.o
+TEST_OBJS := test_game.o Game.o Ball.o Box.o BaseObject.o Console.o PowerUp.o
 TEST_TARGET := test_game
 
 .PHONY: all release test clean
@@ -30,10 +30,11 @@ test_game.o: $(TEST_SRC) Common.h Game.h Ball.h Box.h BaseObject.h Console.h
 	$(CXX) -std=c++11 -Wall -Wextra -g -I. -c -o $@ $<
 
 Main.o: Main.cpp Common.h Game.h
-Game.o: Game.cpp Common.h Game.h
+Game.o: Game.cpp Common.h Game.h PowerUp.h
 Ball.o: Ball.cpp Common.h Ball.h
 Box.o:  Box.cpp  Common.h Box.h
 BaseObject.o: BaseObject.cpp Common.h BaseObject.h
+PowerUp.o: PowerUp.cpp Common.h PowerUp.h
 Console.o: Console.cpp Common.h Console.h
 
 %.o: %.cpp

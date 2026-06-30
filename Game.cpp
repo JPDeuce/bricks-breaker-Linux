@@ -4,431 +4,590 @@
 #include <cstdio>
 #include <cstdlib>
 
+static constexpr int POWERUP_CHANCE = 3;
+
 Game::Game()
 {
-	Reset();
+    Reset();
 }
 
 void Game::Reset()
 {
-	Console::SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-	Console::CursorVisible(false);
-	paddle.width = 12;
-	paddle.height = 2;
-	paddle.x_position = 32;
-	paddle.y_position = 30;
+    Console::SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+    Console::CursorVisible(false);
+    paddle.width = DefaultPaddleWidth;
+    paddle.height = 2;
+    paddle.x_position = 32;
+    paddle.y_position = 30;
 
-	ball.visage = 'O';
-	ball.color = ConsoleColor::Cyan;
-	ResetBall();
-	gameWon = false;
-	gameLost = false;
-	currentLevel = 1;
-	score = 0;
-	lives = 3;
-	LoadLevel(1);
+    ball.visage = 'O';
+    ball.color = ConsoleColor::Cyan;
+    ResetBall();
+    gameWon = false;
+    gameLost = false;
+    currentLevel = 1;
+    score = 0;
+    lives = 3;
+
+    powerUps.clear();
+    widePaddleTimer = 0;
+    fireBallTimer = 0;
+    slowBallTimer = 0;
+    slowToggle = true;
+
+    LoadLevel(1);
 }
 
 void Game::ResetBall()
 {
-	ball.x_position = paddle.x_position + paddle.width / 2;
-	ball.y_position = paddle.y_position - 1;
-	ball.x_velocity = rand() % 2 ? 1 : -1;
-	ball.y_velocity = -1;
-	ball.moving = false;
+    ball.x_position = paddle.x_position + paddle.width / 2;
+    ball.y_position = paddle.y_position - 1;
+    ball.x_velocity = rand() % 2 ? 1 : -1;
+    ball.y_velocity = -1;
+    ball.moving = false;
 }
 
 void Game::LoadLevel(int level)
 {
-	bricks.clear();
-	currentLevel = level;
+    bricks.clear();
+    currentLevel = level;
 
-	// Try loading from a level data file
-	char filename[64];
-	std::snprintf(filename, sizeof(filename), "levels/level%d.txt", level);
+    char filename[64];
+    std::snprintf(filename, sizeof(filename), "levels/level%d.txt", level);
 
-	FILE* f = std::fopen(filename, "r");
-	if (f)
-	{
-		char line[128];
-		while (std::fgets(line, sizeof(line), f))
-		{
-			if (line[0] == '#' || line[0] == '\n' || line[0] == '\r')
-				continue;
+    FILE* f = std::fopen(filename, "r");
+    if (f)
+    {
+        char line[128];
+        while (std::fgets(line, sizeof(line), f))
+        {
+            if (line[0] == '#' || line[0] == '\n' || line[0] == '\r')
+                continue;
 
-			int x, y, w, h, color, dbl;
-			if (std::sscanf(line, "%d %d %d %d %d %d", &x, &y, &w, &h, &color, &dbl) != 6)
-				continue;
+            int x, y, w, h, color, dbl;
+            if (std::sscanf(line, "%d %d %d %d %d %d", &x, &y, &w, &h, &color, &dbl) != 6)
+                continue;
 
-			if (x < 1) x = 1;
-			if (y < 1) y = 1;
-			if (w < 1) w = 1;
-			if (h < 1) h = 1;
-			if (color < 0) color = 0;
-			if (color > 15) color = 15;
+            if (x < 1) x = 1;
+            if (y < 1) y = 1;
+            if (w < 1) w = 1;
+            if (h < 1) h = 1;
+            if (color < 0) color = 0;
+            if (color > 15) color = 15;
 
-			Box brick;
-			brick.x_position = x;
-			brick.y_position = y;
-			brick.width = w;
-			brick.height = h;
-			brick.color = static_cast<ConsoleColor>(color);
-			brick.doubleThick = (dbl != 0);
-			bricks.push_back(brick);
-		}
-		std::fclose(f);
-		return;
-	}
+            Box brick;
+            brick.x_position = x;
+            brick.y_position = y;
+            brick.width = w;
+            brick.height = h;
+            brick.color = static_cast<ConsoleColor>(color);
+            brick.doubleThick = (dbl != 0);
+            bricks.push_back(brick);
+        }
+        std::fclose(f);
+        return;
+    }
 
-	// Fallback: hardcoded levels (used if levels/ directory is missing)
-	if (level == 1)
-	{
-		for (int i = 0; i < 5; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 3 + i * 16;
-			brick.y_position = 6;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::DarkGreen;
-			bricks.push_back(brick);
-		}
-	}
-	else if (level == 2)
-	{
-		for (int i = 0; i < 6; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 1 + i * 12;
-			brick.y_position = 5;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::DarkRed;
-			bricks.push_back(brick);
-		}
+    if (level == 1)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 3 + i * 16;
+            brick.y_position = 6;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::DarkGreen;
+            bricks.push_back(brick);
+        }
+    }
+    else if (level == 2)
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 1 + i * 12;
+            brick.y_position = 5;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::DarkRed;
+            bricks.push_back(brick);
+        }
 
-		for (int i = 0; i < 6; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 7 + i * 12;
-			brick.y_position = 8;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::DarkMagenta;
-			bricks.push_back(brick);
-		}
-	}
-	else if (level == 3)
-	{
-		for (int i = 0; i < 6; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 5 + i * 12;
-			brick.y_position = 4;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::DarkCyan;
-			bricks.push_back(brick);
-		}
+        for (int i = 0; i < 6; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 7 + i * 12;
+            brick.y_position = 8;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::DarkMagenta;
+            bricks.push_back(brick);
+        }
+    }
+    else if (level == 3)
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 5 + i * 12;
+            brick.y_position = 4;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::DarkCyan;
+            bricks.push_back(brick);
+        }
 
-		for (int i = 0; i < 6; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 11 + i * 12;
-			brick.y_position = 7;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::Cyan;
-			bricks.push_back(brick);
-		}
-	}
-	else if (level == 4)
-	{
-		for (int i = 0; i < 7; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 3 + i * 10;
-			brick.y_position = 3;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::DarkYellow;
-			bricks.push_back(brick);
-		}
+        for (int i = 0; i < 6; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 11 + i * 12;
+            brick.y_position = 7;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::Cyan;
+            bricks.push_back(brick);
+        }
+    }
+    else if (level == 4)
+    {
+        for (int i = 0; i < 7; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 3 + i * 10;
+            brick.y_position = 3;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::DarkYellow;
+            bricks.push_back(brick);
+        }
 
-		for (int i = 0; i < 7; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 8 + i * 10;
-			brick.y_position = 6;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::Yellow;
-			bricks.push_back(brick);
-		}
+        for (int i = 0; i < 7; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 8 + i * 10;
+            brick.y_position = 6;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::Yellow;
+            bricks.push_back(brick);
+        }
 
-		for (int i = 0; i < 7; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 3 + i * 10;
-			brick.y_position = 9;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::DarkRed;
-			bricks.push_back(brick);
-		}
-	}
-	else if (level == 5)
-	{
-		for (int i = 0; i < 7; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 3 + i * 10;
-			brick.y_position = 3;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::DarkMagenta;
-			bricks.push_back(brick);
-		}
+        for (int i = 0; i < 7; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 3 + i * 10;
+            brick.y_position = 9;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::DarkRed;
+            bricks.push_back(brick);
+        }
+    }
+    else if (level == 5)
+    {
+        for (int i = 0; i < 7; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 3 + i * 10;
+            brick.y_position = 3;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::DarkMagenta;
+            bricks.push_back(brick);
+        }
 
-		for (int i = 0; i < 7; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 8 + i * 10;
-			brick.y_position = 6;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::Magenta;
-			bricks.push_back(brick);
-		}
+        for (int i = 0; i < 7; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 8 + i * 10;
+            brick.y_position = 6;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::Magenta;
+            bricks.push_back(brick);
+        }
 
-		for (int i = 0; i < 7; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 3 + i * 10;
-			brick.y_position = 9;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::DarkBlue;
-			bricks.push_back(brick);
-		}
+        for (int i = 0; i < 7; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 3 + i * 10;
+            brick.y_position = 9;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::DarkBlue;
+            bricks.push_back(brick);
+        }
 
-		for (int i = 0; i < 7; i++)
-		{
-			Box brick;
-			brick.width = 10;
-			brick.height = 2;
-			brick.x_position = 8 + i * 10;
-			brick.y_position = 12;
-			brick.doubleThick = true;
-			brick.color = ConsoleColor::Blue;
-			bricks.push_back(brick);
-		}
-	}
+        for (int i = 0; i < 7; i++)
+        {
+            Box brick;
+            brick.width = 10;
+            brick.height = 2;
+            brick.x_position = 8 + i * 10;
+            brick.y_position = 12;
+            brick.doubleThick = true;
+            brick.color = ConsoleColor::Blue;
+            bricks.push_back(brick);
+        }
+    }
 }
 
 bool Game::Update()
 {
-	if (GetAsyncKeyState(VK_ESCAPE) & 0x1)
-		return false;
+    if (GetAsyncKeyState(VK_ESCAPE) & 0x1)
+        return false;
 
-	if (GetAsyncKeyState(VK_RIGHT) && paddle.x_position < WINDOW_WIDTH - paddle.width - 1)
-		paddle.x_position += 2;
+    if (GetAsyncKeyState(VK_RIGHT) && paddle.x_position < WINDOW_WIDTH - paddle.width - 1)
+        paddle.x_position += 2;
 
-	if (GetAsyncKeyState(VK_LEFT) && paddle.x_position > 1)
-		paddle.x_position -= 2;
+    if (GetAsyncKeyState(VK_LEFT) && paddle.x_position > 1)
+        paddle.x_position -= 2;
 
-	if (GetAsyncKeyState(VK_SPACE) & 0x1)
-		ball.moving = !ball.moving;
+    if (GetAsyncKeyState(VK_SPACE) & 0x1)
+        ball.moving = !ball.moving;
 
-	if (GetAsyncKeyState('R') & 0x1)
-		Reset();
+    if (GetAsyncKeyState('R') & 0x1)
+        Reset();
 
-	CheckCollision();
-	ball.Update();
-	return true;
+    CheckCollision();
+    UpdatePowerUps();
+
+    if (widePaddleTimer > 0)
+    {
+        widePaddleTimer--;
+        if (widePaddleTimer == 0)
+        {
+            paddle.width = DefaultPaddleWidth;
+            if (!ball.moving)
+                ball.x_position = paddle.x_position + paddle.width / 2;
+        }
+    }
+
+    if (fireBallTimer > 0)
+        fireBallTimer--;
+
+    if (slowBallTimer > 0)
+    {
+        slowBallTimer--;
+        if (slowBallTimer == 0)
+            slowToggle = true;
+    }
+
+    bool shouldMove = (slowBallTimer <= 0) || slowToggle;
+    if (shouldMove)
+        ball.Update();
+    if (slowBallTimer > 0)
+        slowToggle = !slowToggle;
+
+    return true;
 }
 
 void Game::Render() const
 {
-	Console::Lock(true);
-	Console::Clear();
+    Console::Lock(true);
+    Console::Clear();
 
-	Console::DrawBox(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, false);
+    Console::DrawBox(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, false);
 
-	DrawHUD();
+    DrawHUD();
 
-	paddle.Draw();
-	ball.Draw();
+    paddle.Draw();
+    ball.Draw();
 
-	for (auto& b : bricks)
-		b.Draw();
+    for (auto& p : powerUps)
+        p.Draw();
 
-	if (gameWon)
-	{
-		Console::SetCursorPosition(WINDOW_WIDTH / 2 - 16, WINDOW_HEIGHT / 2);
-		std::cout << "You win! Press 'R' to play again.";
-	}
+    for (auto& b : bricks)
+        b.Draw();
 
-	if (gameLost)
-	{
-		Console::SetCursorPosition(WINDOW_WIDTH / 2 - 16, WINDOW_HEIGHT / 2);
-		std::cout << "You lose. Press 'R' to play again.";
-	}
+    if (gameWon)
+    {
+        Console::SetCursorPosition(WINDOW_WIDTH / 2 - 16, WINDOW_HEIGHT / 2);
+        std::cout << "You win! Press 'R' to play again.";
+    }
 
-	Console::Lock(false);
+    if (gameLost)
+    {
+        Console::SetCursorPosition(WINDOW_WIDTH / 2 - 16, WINDOW_HEIGHT / 2);
+        std::cout << "You lose. Press 'R' to play again.";
+    }
+
+    Console::Lock(false);
 }
 
 void Game::DrawHUD() const
 {
-	Console::ForegroundColor(static_cast<WORD>(ConsoleColor::White));
+    Console::ForegroundColor(static_cast<WORD>(ConsoleColor::White));
 
-	char buf[64];
-	std::snprintf(buf, sizeof(buf), "Level: %d", currentLevel);
-	Console::SetCursorPosition(2, 1);
-	std::cout << buf;
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Level: %d", currentLevel);
+    Console::SetCursorPosition(2, 1);
+    std::cout << buf;
 
-	std::snprintf(buf, sizeof(buf), "Score: %d", score);
-	Console::SetCursorPosition(WINDOW_WIDTH / 2 - 4, 1);
-	std::cout << buf;
+    std::snprintf(buf, sizeof(buf), "Score: %d", score);
+    Console::SetCursorPosition(WINDOW_WIDTH / 2 - 4, 1);
+    std::cout << buf;
 
-	std::snprintf(buf, sizeof(buf), "Lives: %d", lives);
-	Console::SetCursorPosition(WINDOW_WIDTH - 12, 1);
-	std::cout << buf;
+    std::snprintf(buf, sizeof(buf), "Lives: %d", lives);
+    Console::SetCursorPosition(WINDOW_WIDTH - 12, 1);
+    std::cout << buf;
+
+    int col = 2;
+    if (widePaddleTimer > 0)
+    {
+        Console::ForegroundColor(static_cast<WORD>(ConsoleColor::Green));
+        Console::SetCursorPosition(col, 2);
+        std::snprintf(buf, sizeof(buf), "[W]Wide %d", (widePaddleTimer + 14) / 15);
+        std::cout << buf;
+        col += 14;
+    }
+    if (fireBallTimer > 0)
+    {
+        Console::ForegroundColor(static_cast<WORD>(ConsoleColor::Yellow));
+        Console::SetCursorPosition(col, 2);
+        std::snprintf(buf, sizeof(buf), "[F]Fire %d", (fireBallTimer + 14) / 15);
+        std::cout << buf;
+        col += 14;
+    }
+    if (slowBallTimer > 0)
+    {
+        Console::ForegroundColor(static_cast<WORD>(ConsoleColor::Cyan));
+        Console::SetCursorPosition(col, 2);
+        std::snprintf(buf, sizeof(buf), "[S]Slow %d", (slowBallTimer + 14) / 15);
+        std::cout << buf;
+    }
+}
+
+void Game::SpawnPowerUp(int x, int y)
+{
+    if (rand() % POWERUP_CHANCE != 0)
+        return;
+
+    PowerUpType types[] = {
+        PowerUpType::WidePaddle,
+        PowerUpType::ExtraLife,
+        PowerUpType::FireBall,
+        PowerUpType::SlowBall
+    };
+    PowerUpType type = types[rand() % static_cast<int>(PowerUpType::Count)];
+    powerUps.push_back(PowerUp(type, x - 1, y));
+}
+
+void Game::UpdatePowerUps()
+{
+    for (size_t i = 0; i < powerUps.size(); i++)
+    {
+        PowerUp& p = powerUps[i];
+        p.Update();
+
+        bool collected = p.Overlaps(paddle.x_position, paddle.y_position,
+                                    paddle.width, paddle.height);
+        if (collected)
+        {
+            CollectPowerUp(p);
+            powerUps.erase(powerUps.begin() + i);
+            i--;
+            continue;
+        }
+
+        if (p.y_position >= WINDOW_HEIGHT - 1)
+        {
+            powerUps.erase(powerUps.begin() + i);
+            i--;
+        }
+    }
+}
+
+void Game::CollectPowerUp(const PowerUp& p)
+{
+    std::cout << '\a';
+
+    switch (p.type)
+    {
+    default: break;
+    case PowerUpType::WidePaddle:
+        paddle.width = WidePaddleWidth;
+        widePaddleTimer = 150;
+        if (!ball.moving)
+            ball.x_position = paddle.x_position + paddle.width / 2;
+        break;
+
+    case PowerUpType::ExtraLife:
+        if (lives < 9)
+            lives++;
+        break;
+
+    case PowerUpType::FireBall:
+        fireBallTimer = 120;
+        break;
+
+    case PowerUpType::SlowBall:
+        slowBallTimer = 120;
+        slowToggle = true;
+        break;
+    }
 }
 
 void Game::CheckCollision()
 {
-	int bx = ball.x_position;
-	int by = ball.y_position;
-	int vx = ball.x_velocity;
-	int vy = ball.y_velocity;
-	int nextX = bx + vx;
-	int nextY = by + vy;
+    int bx = ball.x_position;
+    int by = ball.y_position;
+    int vx = ball.x_velocity;
+    int vy = ball.y_velocity;
+    int nextX = bx + vx;
+    int nextY = by + vy;
 
-	// --- Brick collisions ---
-	for (size_t i = 0; i < bricks.size(); i++)
-	{
-		Box& brick = bricks[i];
-		bool hit = false;
-		bool hitX = false;
-		bool hitY = false;
+    // --- Brick collisions ---
+    if (fireBallTimer > 0)
+    {
+        for (size_t i = 0; i < bricks.size(); i++)
+        {
+            Box& brick = bricks[i];
+            bool hit = false;
 
-		// Determine how the ball enters the brick
-		if (brick.Contains(nextX, nextY))
-		{
-			// Full next position is inside → determine which face(s) were crossed
-			hit = true;
-			bool outsideX = (bx < brick.x_position || bx >= brick.x_position + brick.width);
-			bool outsideY = (by < brick.y_position || by >= brick.y_position + brick.height);
-			if (outsideX) hitX = true;
-			if (outsideY) hitY = true;
-			if (!outsideX && !outsideY)
-				hitX = hitY = true;
-		}
+            if (brick.Contains(nextX, nextY))
+                hit = true;
+            else if (brick.Contains(bx, nextY))
+                hit = true;
+            else if (brick.Contains(nextX, by))
+                hit = true;
 
-		if (!hit && brick.Contains(bx, nextY))
-		{
-			// Only Y changed, X stayed the same → vertical entry
-			hit = true;
-			hitY = true;
-		}
+            if (hit)
+            {
+                SpawnPowerUp(brick.x_position + brick.width / 2,
+                             brick.y_position + brick.height);
+                bricks.erase(bricks.begin() + i);
+                i--;
+                score += 100 * currentLevel;
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < bricks.size(); i++)
+        {
+            Box& brick = bricks[i];
+            bool hit = false;
+            bool hitX = false;
+            bool hitY = false;
 
-		if (!hit && brick.Contains(nextX, by))
-		{
-			// Only X changed, Y stayed the same → horizontal entry
-			hit = true;
-			hitX = true;
-		}
+            if (brick.Contains(nextX, nextY))
+            {
+                hit = true;
+                bool outsideX = (bx < brick.x_position || bx >= brick.x_position + brick.width);
+                bool outsideY = (by < brick.y_position || by >= brick.y_position + brick.height);
+                if (outsideX) hitX = true;
+                if (outsideY) hitY = true;
+                if (!outsideX && !outsideY)
+                    hitX = hitY = true;
+            }
 
-		if (!hit)
-			continue;
+            if (!hit && brick.Contains(bx, nextY))
+            {
+                hit = true;
+                hitY = true;
+            }
 
-		// Dim the brick
-		int c = static_cast<int>(brick.color);
-		if (c > static_cast<int>(ConsoleColor::Black))
-			brick.color = static_cast<ConsoleColor>(c - 1);
+            if (!hit && brick.Contains(nextX, by))
+            {
+                hit = true;
+                hitX = true;
+            }
 
-		// Reverse velocity on the appropriate axes
-		if (hitX) vx *= -1;
-		if (hitY) vy *= -1;
+            if (!hit)
+                continue;
 
-		// Remove brick if fully dimmed
-		if (brick.color == ConsoleColor::Black)
-		{
-			bricks.erase(bricks.begin() + i);
-			i--;
-			score += 100 * currentLevel;
+            int c = static_cast<int>(brick.color);
+            if (c > static_cast<int>(ConsoleColor::Black))
+                brick.color = static_cast<ConsoleColor>(c - 1);
 
-			// Recalculate next position with updated velocity
-			nextX = bx + vx;
-			nextY = by + vy;
-		}
-		else
-		{
-			break;
-		}
-	}
+            if (hitX) vx *= -1;
+            if (hitY) vy *= -1;
 
-	ball.x_velocity = vx;
-	ball.y_velocity = vy;
+            if (brick.color == ConsoleColor::Black)
+            {
+                SpawnPowerUp(brick.x_position + brick.width / 2,
+                             brick.y_position + brick.height);
+                bricks.erase(bricks.begin() + i);
+                i--;
+                score += 100 * currentLevel;
 
-	// --- Level complete? ---
-	if (bricks.empty())
-	{
-		if (currentLevel < 5)
-		{
-			LoadLevel(currentLevel + 1);
-			ResetBall();
-		}
-		else
-		{
-			gameWon = true;
-			ball.moving = false;
-		}
-		return;
-	}
+                nextX = bx + vx;
+                nextY = by + vy;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
 
-	// --- Paddle collision ---
-	// Recalculate next position with the (possibly updated) velocity
-	nextX = ball.x_position + ball.x_velocity;
-	nextY = ball.y_position + ball.y_velocity;
+    ball.x_velocity = vx;
+    ball.y_velocity = vy;
 
-	if (paddle.Contains(nextX, nextY)
-		|| paddle.Contains(nextX, ball.y_position)
-		|| paddle.Contains(ball.x_position, nextY))
-	{
-		float ratio = static_cast<float>(ball.x_position - paddle.x_position) / paddle.width;
-		ball.x_velocity = static_cast<int>((ratio - 0.5f) * 4.0f);
-		if (ball.x_velocity == 0)
-			ball.x_velocity = (rand() % 2) ? -1 : 1;
-		ball.y_velocity = -1;
-		ball.y_position = paddle.y_position - 1;
-	}
+    // --- Level complete? ---
+    if (bricks.empty())
+    {
+        paddle.width = DefaultPaddleWidth;
+        widePaddleTimer = 0;
+        fireBallTimer = 0;
+        slowBallTimer = 0;
+        slowToggle = true;
 
-	// --- Ball fell off bottom ---
-	nextY = ball.y_position + ball.y_velocity;
-	if (nextY >= WINDOW_HEIGHT - 1)
-	{
-		lives--;
-		if (lives > 0)
-		{
-			ResetBall();
-		}
-		else
-		{
-			ball.moving = false;
-			gameLost = true;
-		}
-	}
+        if (currentLevel < 5)
+        {
+            LoadLevel(currentLevel + 1);
+            ResetBall();
+        }
+        else
+        {
+            gameWon = true;
+            ball.moving = false;
+        }
+        return;
+    }
+
+    // --- Paddle collision ---
+    nextX = ball.x_position + ball.x_velocity;
+    nextY = ball.y_position + ball.y_velocity;
+
+    if (paddle.Contains(nextX, nextY)
+        || paddle.Contains(nextX, ball.y_position)
+        || paddle.Contains(ball.x_position, nextY))
+    {
+        float ratio = static_cast<float>(ball.x_position - paddle.x_position) / paddle.width;
+        ball.x_velocity = static_cast<int>((ratio - 0.5f) * 4.0f);
+        if (ball.x_velocity == 0)
+            ball.x_velocity = (rand() % 2) ? -1 : 1;
+        ball.y_velocity = -1;
+        ball.y_position = paddle.y_position - 1;
+    }
+
+    // --- Ball fell off bottom ---
+    nextY = ball.y_position + ball.y_velocity;
+    if (nextY >= WINDOW_HEIGHT - 1)
+    {
+        lives--;
+        if (lives > 0)
+        {
+            ResetBall();
+        }
+        else
+        {
+            ball.moving = false;
+            gameLost = true;
+        }
+    }
 }
